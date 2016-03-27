@@ -6,9 +6,7 @@ import cn.com.lifeng.job.JobStatusCacheTask;
 import cn.com.lifeng.util.FileUtil;
 import cn.com.lifeng.util.JobStatus;
 import org.apache.commons.cli.*;
-
 import java.io.File;
-import java.util.Iterator;
 
 /**
  * Hello world!
@@ -20,8 +18,9 @@ public class Bootstrap {
     private String inputPath;
     private String outputPath;
     private String currentFileName = null;
-    private long  currentLineNumber = 1;
+    private long currentLineNumber = 1;
     private Scheduler scheduler;
+
     public Bootstrap(String inputPath, String outputPath) throws Exception {
         this.inputPath = inputPath;
         this.outputPath = outputPath;
@@ -33,7 +32,7 @@ public class Bootstrap {
         this.threadNum = threadNum;
     }
 
-    public void setTaskStatusPath( String taskStatusFilePath) throws Exception {
+    public void setTaskStatusPath(String taskStatusFilePath) throws Exception {
         statusFilePath = taskStatusFilePath;
         FileUtil.isAbsolute(statusFilePath);
     }
@@ -49,7 +48,7 @@ public class Bootstrap {
         // 初始化jobstatus
         JobStatus jobStatus = JobStatusCacheTask.getTaskStatus(statusFilePath);
         // 修改 job运行状态
-        if(currentFileName!=null){
+        if (currentFileName != null) {
             jobStatus.setCurrentFileName(currentFileName);
             jobStatus.setCurrentLineNumber(currentLineNumber);
         }

@@ -22,6 +22,7 @@ public class FileNameCacheTest extends TestCase {
         assertEquals("/home/output/logtest.2013-02-01.log", fileNameCache.getOutputFileNameByIndex(2));
         assertEquals("/home/output/logtest.2014-01-01.log", fileNameCache.getOutputFileNameByIndex(3));
         fileNameCache.addFile("/home/logtest.2009-01-01.log");
-        assertEquals(4,fileNameCache.getSize());
+        assertEquals(4, fileNameCache.getSize());
+        System.out.println("\r\n".getBytes().length);
     }
 }

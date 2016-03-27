@@ -3,6 +3,7 @@ package cn.com.lifeng.bootstrap;
 import cn.com.lifeng.job.*;
 import cn.com.lifeng.util.JobStatus;
 
+import java.nio.ByteBuffer;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.*;
@@ -19,18 +20,30 @@ public class Scheduler {
     private int batch = 1000;
     private int[] firstColumnNumCache = new int[batch];
     private int[] secondColumnNumCache = new int[batch];
+    private LinkedBlockingQueue<ByteBuffer> resource;
+    // 每行记录最大1M
+    private static final int CAPACITY = 1024 * 1024;
+    private static final int MAX_THREAD_NUM = 15;
 
     public Scheduler(FileNameCache fileNameCache, JobStatus jobStatus, int threadNum) {
         this.fileNameCache = fileNameCache;
         this.jobStatus = jobStatus;
-        this.threadNum = threadNum;
+        if(threadNum>MAX_THREAD_NUM) {
+            this.threadNum = MAX_THREAD_NUM;
+            System.out.println("WARN: threadNum is too large,will change the threadNum to 15");
+        } else {
+            this.threadNum = threadNum;
+        }
     }
 
     private void init() {
         fileNameCache.startListAllFile();
         startExecutor();
+        resource = new LinkedBlockingQueue<ByteBuffer>(2 * threadNum);
+        for (int i = 0; i < 2 * threadNum; i++) {
+            resource.offer(ByteBuffer.allocate(CAPACITY));
+        }
     }
-
     //1000000个文件几T数据，那1000个文件几G数据，ssd随机写磁盘性能70M，那么最多30s
     public void start() {
         init();
@@ -38,7 +51,7 @@ public class Scheduler {
         if (size == 0) {
             return;
         }
-        int batchTotal = (size / batch+1);
+        int batchTotal = (size / batch + 1);
         int batchNum = 0;
         long currentLineNumber = jobStatus.getCurrentLineNumber();
 
@@ -58,18 +71,21 @@ public class Scheduler {
                 int secondTaskReadIdNum = (batchNum + 1) * batch;
                 int taskReadNum = getCurrentBatchTaskNum(secondTaskReadIdNum);
 
-                for (int i = 0; i < taskWriteNum; i++) {
-                    if (i < taskReadNum) {
-                        FileRelatedTask readTask = new RetryTask(new FileLineNumberTask(fileNameCache.getInputFileNameByIndex(secondTaskReadIdNum + i)));
-                        jobs.add(executorService.submit(new FileRelatedCallable(readTask, i)));
-                    }
-                    FileRelatedTask writeTask = new RetryTask(new FileWriteTask(fileNameCache.getInputFileNameByIndex(firstTaskWriteIdNum + i), fileNameCache.getOutputFileNameByIndex(firstTaskWriteIdNum + i), currentLineNumber));
-                    jobs.add(executorService.submit(new FileRelatedCallable(writeTask)));
-                    currentLineNumber += readCache[i];
-                }
                 try {
+                    for (int i = 0; i < taskWriteNum; i++) {
+                        if (i < taskReadNum) {
+                            ByteBuffer byteBuffer = resource.take();
+                            FileRelatedTask readTask = new RetryTask(new FileLineNumberTask(fileNameCache.getInputFileNameByIndex(secondTaskReadIdNum + i), byteBuffer));
+                            jobs.add(executorService.submit(new FileRelatedCallable(readTask, resource, i)));
+                        }
+                        ByteBuffer readBuffer = resource.take();
+                        ByteBuffer writeBuffer = resource.take();
+                        FileRelatedTask writeTask = new RetryTask(new FileWriteTask(fileNameCache.getInputFileNameByIndex(firstTaskWriteIdNum + i), fileNameCache.getOutputFileNameByIndex(firstTaskWriteIdNum + i), readBuffer, writeBuffer, currentLineNumber));
+                        jobs.add(executorService.submit(new FileRelatedCallable(writeTask, resource)));
+                        currentLineNumber += readCache[i];
+                    }
                     for (Future<String> job : jobs) {
-                        String result = job.get(4, TimeUnit.MINUTES);
+                        String result = job.get(1, TimeUnit.MINUTES);
                         processJobResult(result, writeCache);
                         if (!currentJobIsSuccess) break;
                     }
@@ -100,12 +116,17 @@ public class Scheduler {
         int taskNum = getCurrentBatchTaskNum(firstTaskIdNum);
 
         for (int i = 0; i < taskNum; i++) {
-            FileRelatedTask readTask = new RetryTask(new FileLineNumberTask(fileNameCache.getInputFileNameByIndex(firstTaskIdNum + i)));
-            jobs.add(executorService.submit(new FileRelatedCallable(readTask, i)));
+            try {
+                ByteBuffer byteBuffer = resource.take();
+                FileRelatedTask readTask = new RetryTask(new FileLineNumberTask(fileNameCache.getInputFileNameByIndex(firstTaskIdNum + i), byteBuffer));
+                jobs.add(executorService.submit(new FileRelatedCallable(readTask, resource, i)));
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
         }
         try {
             for (Future<String> job : jobs) {
-                String result = job.get(4, TimeUnit.MINUTES);
+                String result = job.get(1, TimeUnit.MINUTES);
                 processJobResult(result, writeCache);
                 if (!currentJobIsSuccess) break;
             }

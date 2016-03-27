@@ -16,12 +16,12 @@ public class FileUtil {
     }
 
     public static void mkDir(String path) throws Exception {
-        if(path.equals(".")) return;
+        if (path.equals(".")) return;
         int retryTimes = 3;
         boolean createSuccess = false;
         while (retryTimes > 0) {
             File file = new File(path);
-            if (file.exists()|| file.mkdirs()) {
+            if (file.exists() || file.mkdirs()) {
                 createSuccess = true;
                 break;
             }
@@ -30,9 +30,9 @@ public class FileUtil {
         if (!createSuccess) throw new Exception("Path:" + path + " can not be initial");
     }
 
-    public static void isAbsolute(String path) throws Exception{
+    public static void isAbsolute(String path) throws Exception {
         File file = new File(path);
-        if(!file.isAbsolute()){
+        if (!file.isAbsolute()) {
             throw new Exception("Path:" + path + " is not absolute");
         }
     }

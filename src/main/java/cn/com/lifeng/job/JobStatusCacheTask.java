@@ -22,7 +22,7 @@ public class JobStatusCacheTask {
             String taskStatus = fileBuffer.readLine();
             jobStatus.setFileNameAndLineNumber(taskStatus);
         } catch (IOException e) {
-            System.out.println("Warn: Job init file "+statusFilePath +" is not existed, it will start the job from beginning");
+            System.out.println("Warn: Job init file " + statusFilePath + " is not existed, it will start the job from beginning");
         } finally {
             try {
                 if (fileBuffer != null) {

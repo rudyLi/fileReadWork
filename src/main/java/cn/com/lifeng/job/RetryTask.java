@@ -1,11 +1,12 @@
 package cn.com.lifeng.job;
 
+import java.nio.ByteBuffer;
 import java.util.concurrent.TimeUnit;
 
 /**
  * Created by lifeng on 16/3/27.
  */
-public class RetryTask implements FileRelatedTask{
+public class RetryTask implements FileRelatedTask {
     private FileRelatedTask delegate;
     private int retryTimes;
 
@@ -15,7 +16,7 @@ public class RetryTask implements FileRelatedTask{
         while (retryTimes > 0) {
             result = delegate.start();
             retryTimes -= 1;
-            if (result>=0) break;
+            if (result >= 0) break;
             //最后一次时不需要sleep
             if (retryTimes > 0) {
                 try {
@@ -28,10 +29,16 @@ public class RetryTask implements FileRelatedTask{
         return result;
     }
 
-    public RetryTask(FileRelatedTask fileRelatedTask){
-        this(fileRelatedTask,3);
+    @Override
+    public ByteBuffer[] release() {
+        return delegate.release();
     }
-    public RetryTask(FileRelatedTask fileRelatedTask,int retryTimes){
+
+    public RetryTask(FileRelatedTask fileRelatedTask) {
+        this(fileRelatedTask, 3);
+    }
+
+    public RetryTask(FileRelatedTask fileRelatedTask, int retryTimes) {
         delegate = fileRelatedTask;
         this.retryTimes = retryTimes;
     }

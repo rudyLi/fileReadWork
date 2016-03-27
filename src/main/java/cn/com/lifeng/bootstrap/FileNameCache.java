@@ -29,7 +29,7 @@ public class FileNameCache {
     private String inputPath;
     private String outputPath;
 
-    public FileNameCache(String inputPath, String outputPath,String fileBegin) {
+    public FileNameCache(String inputPath, String outputPath, String fileBegin) {
         this.inputPath = inputPath;
         this.outputPath = outputPath;
 
@@ -56,7 +56,7 @@ public class FileNameCache {
                 addFile(file.getFileName().toString());
             }
         } catch (IOException e) {
-            System.err.println(e);
+            e.printStackTrace();
         }
     }
 
