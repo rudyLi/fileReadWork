@@ -1,6 +1,6 @@
 package cn.com.lifeng.bootstrap;
 
-import cn.com.lifeng.util.FileNameUtil;
+import cn.com.lifeng.job.*;
 import cn.com.lifeng.util.JobStatus;
 
 import java.util.concurrent.*;
@@ -9,22 +9,19 @@ import java.util.concurrent.*;
  * Created by lifeng on 16/3/26.
  */
 public class Scheduler {
-    private FileNameUtil fileNameUtil;
+    private FileNameCache fileNameCache;
     private int threadNum;
-    private ScheduledExecutorService scheduleService = Executors.newScheduledThreadPool(1);
     private ExecutorService executorService = null;
     private volatile JobStatus jobStatus = new JobStatus();
     private volatile boolean currentJobIsSuccess = true;
 
     private int batch = 1000;
-    private VolatileInt[] volatileIntArray = new VolatileInt[batch];
 
-    public Scheduler(FileNameUtil fileNameUtil, JobStatus jobStatus) {
-        this.fileNameUtil = fileNameUtil;
-        this.jobStatus = jobStatus;
-    }
+    private VolatileInt[] firstColumnNumCache = new VolatileInt[batch];
+    private VolatileInt[] secondColumnNumCache = new VolatileInt[batch];
 
-    public void setJobStatus(JobStatus jobStatus) {
+    public Scheduler(FileNameCache fileNameCache, JobStatus jobStatus) {
+        this.fileNameCache = fileNameCache;
         this.jobStatus = jobStatus;
     }
 
@@ -32,47 +29,100 @@ public class Scheduler {
         this.threadNum = threadNum;
     }
 
-    //1000000个文件几T数据，那1000个文件几G数据，ssd随机写磁盘性能70M，那么最多
+    //1000000个文件几T数据，那1000个文件几G数据，ssd随机写磁盘性能70M，那么最多30s
     public void start() {
+        fileNameCache.startListAllFile();
+        int size = fileNameCache.getSize();
+        if (size == 0) {
+            return;
+        }
         startExecutor();
-        int size = fileNameUtil.getSize();
         int batchTotal = (size / batch) + 1;
         int batchNum = 0;
         long currentLineNumber = jobStatus.getCurrentLineNumber();
 
+        setFirstBatchRead();
         while (batchNum < batchTotal) {
-            int firstTaskIdNum = batchNum * batch;
-            int taskNum = size - firstTaskIdNum;
-            CountDownLatch countDownLatch = new CountDownLatch(taskNum);
-            for (int i = 0; i < taskNum; i++) {
-                executorService.submit(new FileLineNumberJob(i, fileNameUtil.getInputFileNameByIndex(firstTaskIdNum + i), countDownLatch));
-            }
-            try {
-                countDownLatch.await(10, TimeUnit.MINUTES);
-            } catch (InterruptedException e) {
-                e.printStackTrace();
+            if (currentJobIsSuccess) {
+                boolean readFirstCache = true;
+                VolatileInt[] readCache = firstColumnNumCache;
+                if (batchNum % 2 != 0) {
+                    readFirstCache = false;
+                    readCache = secondColumnNumCache;
+                }
+                int firstTaskWriteIdNum = batchNum * batch;
+                int taskWriteNum = getCurrentBatchTaskNum(firstTaskWriteIdNum);
+                int secondTaskReadIdNum = (batchNum + 1) * batch;
+                int taskReadNum = getCurrentBatchTaskNum(secondTaskReadIdNum);
+
+                CountDownLatch countDownLatch = new CountDownLatch(taskReadNum + taskWriteNum);
+                for (int i = 0; i < taskWriteNum; i++) {
+                    if (i < taskReadNum) {
+                        FileRelatedTask readTask = new RetryTask(new FileLineNumberTask(fileNameCache.getInputFileNameByIndex(secondTaskReadIdNum + i)));
+                        executorService.submit(new FileRelatedJob(readTask, countDownLatch, !readFirstCache, i));
+                    }
+                    FileRelatedTask writeTask = new RetryTask(new FileWriteTask(fileNameCache.getInputFileNameByIndex(firstTaskWriteIdNum + i), fileNameCache.getOutputFileNameByIndex(firstTaskWriteIdNum + i), currentLineNumber));
+                    executorService.submit(new FileRelatedJob(writeTask, countDownLatch));
+                    currentLineNumber += readCache[i].ele;
+                }
+                try {
+                    countDownLatch.await(10, TimeUnit.MINUTES);
+                    //全部成功 记录其状态
+                    if(currentJobIsSuccess) {
+                        writeJobStatus(firstTaskWriteIdNum + taskWriteNum - 1, currentLineNumber);
+                        batchNum += 1;
+                    }
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                    currentJobIsSuccess  = false;
+                }
+            } else {
                 break;
             }
-            CountDownLatch writeCountDown = new CountDownLatch(taskNum);
-            for (int i = 0; i < taskNum; i++) {
-                executorService.submit(new FileWriteJob(fileNameUtil.getInputFileNameByIndex(firstTaskIdNum + i), fileNameUtil.getOutputFileNameByIndex(firstTaskIdNum + i), currentLineNumber, writeCountDown));
-                currentLineNumber += volatileIntArray[i].ele;
-            }
-            try {
-                writeCountDown.await(10, TimeUnit.MINUTES);
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-                break;
-            }
-            // current fileName and column number 一一对应，两者必须同时更新，保持一个事务
-            jobStatus.setFileNameAndLineNumber(fileNameUtil.getInputFileNameByIndex(firstTaskIdNum + taskNum - 1), currentLineNumber);
-            batchNum += 1;
         }
-        stop();
+        if(currentJobIsSuccess){
+            stop();
+        } else {
+            stopNow();
+        }
+    }
+
+    private void writeJobStatus(int fileId, long currentLineNumber) {
+        jobStatus.setCurrentFileName(fileNameCache.getInputFileNameByIndex(fileId));
+        jobStatus.setCurrentLineNumber(currentLineNumber);
+        executorService.submit(new StatusWriteTask(JobStatus.clone(jobStatus)));
+    }
+
+    private int getCurrentBatchTaskNum(int taskStartId) {
+        int taskNum = fileNameCache.getSize() - taskStartId;
+        if (taskNum > batch) {
+            taskNum = batch;
+        } else if (taskNum < 0) {
+            taskNum = 0;
+        }
+        return taskNum;
+    }
+
+    private void setFirstBatchRead() {
+        int firstTaskIdNum = 0;
+        int taskNum = fileNameCache.getSize();
+        if (taskNum > batch) {
+            taskNum = batch;
+        }
+        CountDownLatch countDownLatch = new CountDownLatch(taskNum);
+        for (int i = 0; i < taskNum; i++) {
+            FileRelatedTask readTask = new RetryTask(new FileLineNumberTask(fileNameCache.getInputFileNameByIndex(firstTaskIdNum + i)));
+            executorService.submit(new FileRelatedJob(readTask, countDownLatch, true, i));
+        }
+        try {
+            countDownLatch.await(10, TimeUnit.MINUTES);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+            currentJobIsSuccess = false;
+        }
     }
 
     private void startExecutor() {
-        scheduleService.scheduleAtFixedRate(new StatusScheduleWriteTask(), 10, 60, TimeUnit.SECONDS);
         executorService = Executors.newFixedThreadPool(threadNum);
     }
 
@@ -80,73 +130,71 @@ public class Scheduler {
         if (executorService != null) {
             executorService.shutdown();
         }
-        scheduleService.shutdown();
+    }
+
+    public void stopNow() {
+        if (executorService != null) {
+            executorService.shutdownNow();
+        }
     }
 
     private class VolatileInt {
+        volatile int ele;
+
         VolatileInt(int ele) {
             this.ele = ele;
         }
-
-        volatile int ele = 0;
     }
 
-    private class StatusScheduleWriteTask implements Runnable {
+    private class StatusWriteTask implements Runnable {
+        private JobStatus jobStatus;
+
+        StatusWriteTask(JobStatus jobStatus) {
+            this.jobStatus = jobStatus;
+        }
+
         @Override
         public void run() {
             JobStatusCacheTask.setTaskStatus(jobStatus);
         }
     }
 
-    private class FileLineNumberJob implements Runnable {
-        int index;
-        String fileName;
+    private class FileRelatedJob implements Runnable {
         CountDownLatch jobLac;
+        FileRelatedTask delegate;
+        boolean firstCache;
+        int index = -1;
 
-        FileLineNumberJob(int index, String fileName, CountDownLatch jobLac) {
-            this.index = index;
-            this.fileName = fileName;
+        FileRelatedJob(FileRelatedTask fileRelatedTask, CountDownLatch jobLac) {
+            this(fileRelatedTask, jobLac, true);
+        }
+
+        FileRelatedJob(FileRelatedTask fileRelatedTask, CountDownLatch jobLac, boolean firstCache) {
+            this(fileRelatedTask, jobLac, firstCache, -1);
+        }
+
+        FileRelatedJob(FileRelatedTask fileRelatedTask, CountDownLatch jobLac, boolean firstCache, int index) {
             this.jobLac = jobLac;
+            delegate = fileRelatedTask;
+            this.index = index;
+            this.firstCache = firstCache;
         }
 
         @Override
         public void run() {
             if (currentJobIsSuccess) {
-                int lineNumber = new FileLineNumberTask(fileName).getLineNumber();
-                if (lineNumber < 0) {
+                int result = delegate.start();
+                if (result < 0) {
                     currentJobIsSuccess = false;
-                } else {
-                    volatileIntArray[index] = new VolatileInt(lineNumber);
+                } else if (index >= 0) {
+                    if (firstCache) {
+                        firstColumnNumCache[index] = new VolatileInt(result);
+                    } else {
+                        secondColumnNumCache[index] = new VolatileInt(result);
+                    }
                 }
             }
             jobLac.countDown();
-        }
-    }
-
-    private class FileWriteJob implements Runnable {
-        String inputFile;
-        String outputFile;
-        long fileLineNumber;
-        CountDownLatch jobLoc;
-
-        FileWriteJob(String inputFile, String outputFile, long fileLineNumber, CountDownLatch jobLoc) {
-            this.fileLineNumber = fileLineNumber;
-            this.inputFile = inputFile;
-            this.outputFile = outputFile;
-            this.jobLoc = jobLoc;
-        }
-
-        @Override
-        public void run() {
-            if (currentJobIsSuccess) {
-                boolean writeSuccess = new FileWriteTask(inputFile, outputFile, fileLineNumber).startWrite();
-                if (!writeSuccess) {
-                    currentJobIsSuccess = false;
-                } else {
-                    //  System.out.println("input:" + inputFile + "---------" + "lineNumber:" + fileLineNumber);
-                }
-            }
-            jobLoc.countDown();
         }
     }
 }

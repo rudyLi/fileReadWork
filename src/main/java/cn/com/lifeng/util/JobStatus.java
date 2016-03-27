@@ -8,6 +8,14 @@ public class JobStatus {
     private String currentFileName = null;
     private String statusFilePath;
 
+    public static JobStatus clone(JobStatus jobStatus){
+        JobStatus newJobStatus = new JobStatus();
+        newJobStatus.setCurrentFileName(jobStatus.getCurrentFileName());
+        newJobStatus.setCurrentLineNumber(jobStatus.getCurrentLineNumber());
+        newJobStatus.setStatusFilePath(jobStatus.getStatusFilePath());
+        return newJobStatus;
+    }
+
     public long getCurrentLineNumber() {
         return currentLineNumber;
     }
@@ -24,11 +32,6 @@ public class JobStatus {
         this.currentFileName = currentFileName;
     }
 
-    public synchronized void setFileNameAndLineNumber(String currentFileName, long currentLineNumber) {
-        this.currentFileName = currentFileName;
-        this.currentLineNumber = currentLineNumber;
-    }
-
     //todo 处理job status状态读取格式.以冒号分隔，文件中有冒号会发生错误
     public void setFileNameAndLineNumber(String fileNameAndLineNumber) {
         if(fileNameAndLineNumber!=null && !fileNameAndLineNumber.trim().isEmpty()) {
@@ -38,7 +41,7 @@ public class JobStatus {
         }
     }
 
-    public synchronized String getFileNameAndLineNumber() {
+    public String getFileNameAndLineNumber() {
         return this.currentFileName + ":" + this.currentLineNumber;
     }
 

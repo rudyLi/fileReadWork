@@ -1,4 +1,4 @@
-package cn.com.lifeng.util;
+package cn.com.lifeng.bootstrap;
 
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -12,7 +12,7 @@ import java.util.Date;
 /**
  * Created by lifeng on 16/3/26.
  */
-public class FileNameUtil {
+public class FileNameCache {
     /*1000000个小文件，如果直接记录名字的话，比如filename是'logtest.2014-06-05.log',一个filename占用存储空间为22个字节,
     则光名字存储就需要22M，所以对filename进行简化，只需要存储其日期数字即可，这样一个filename存储空间为4个字节，占用内存接近
     3M，至于不使用jdk自带的数据结构，是为了减少内存的使用
@@ -29,23 +29,21 @@ public class FileNameUtil {
     private String inputPath;
     private String outputPath;
 
-    public FileNameUtil(String inputPath, String outputPath) {
+    public FileNameCache(String inputPath, String outputPath,String fileBegin) {
         this.inputPath = inputPath;
         this.outputPath = outputPath;
-        processFilePath();
+
+        processFilePath(fileBegin);
     }
 
-    private void processFilePath() {
+    private void processFilePath(String fileBegin) {
         if (!inputPath.endsWith(File.separator)) {
             inputPath += File.separator;
         }
         if (!outputPath.endsWith(File.separator)) {
             outputPath += File.separator;
         }
-    }
-
-    public void setFileBegin(String fileBegin) {
-        if (fileDateBegin != 0 && fileBegin != null) {
+        if (fileBegin != null) {
             this.fileDateBegin = parseFileDate(fileBegin);
         }
     }
@@ -86,7 +84,7 @@ public class FileNameUtil {
 
     public void addFile(String fileName) {
         int date = parseFileDate(fileName);
-        if (date > 0 && date > fileDateBegin) {
+        if (date > fileDateBegin) {
             ensureCapacity(size + 1);
             sortAndAddFileName(date);
             size += 1;
@@ -151,26 +149,5 @@ public class FileNameUtil {
             name = outputPath + name;
         }
         return name;
-    }
-
-    public static void checkFileExist(String path) throws FileNotFoundException {
-        File file = new File(path);
-        if (!file.exists()) {
-            throw new FileNotFoundException(path);
-        }
-
-    }
-
-    public static void mkDir(String path) throws Exception {
-        int retryTimes = 3;
-        boolean createSuccess = false;
-        while (retryTimes < 0) {
-            File file = new File(path);
-            if (file.mkdirs()) {
-                createSuccess = true;
-                break;
-            }
-        }
-        if (createSuccess) throw new Exception("Path:" + path + " can not initial");
     }
 }

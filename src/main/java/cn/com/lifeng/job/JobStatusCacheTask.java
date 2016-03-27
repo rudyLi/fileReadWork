@@ -1,4 +1,4 @@
-package cn.com.lifeng.bootstrap;
+package cn.com.lifeng.job;
 
 import cn.com.lifeng.util.JobStatus;
 
@@ -22,7 +22,7 @@ public class JobStatusCacheTask {
             String taskStatus = fileBuffer.readLine();
             jobStatus.setFileNameAndLineNumber(taskStatus);
         } catch (IOException e) {
-            e.printStackTrace();
+            System.out.println("Warn: Job init file "+statusFilePath +" is not existed, it will start the job from beginning");
         } finally {
             try {
                 if (fileBuffer != null) {
