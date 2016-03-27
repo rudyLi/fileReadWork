@@ -8,6 +8,7 @@ import cn.com.lifeng.util.JobStatus;
 import org.apache.commons.cli.*;
 
 import java.io.File;
+import java.util.Iterator;
 
 /**
  * Hello world!
@@ -53,8 +54,8 @@ public class Bootstrap {
             jobStatus.setCurrentLineNumber(currentLineNumber);
         }
         FileNameCache fileNameCache = new FileNameCache(inputPath, outputPath, jobStatus.getCurrentFileName());
-        scheduler = new Scheduler(fileNameCache, jobStatus);
-        scheduler.setThreadNum(threadNum);
+        scheduler = new Scheduler(fileNameCache, jobStatus, threadNum);
+
     }
 
     private void checkFileExist() throws Exception {
@@ -79,10 +80,10 @@ public class Bootstrap {
         Options options = new Options();
         options.addOption(inputFileCommand, true, "Must. EG: /input,WARN: Must ensure input and output can not the same directory，please use absolute path");
         options.addOption(outputFileCommand, true, "Must. EG: /output,WARN: Must ensure input and output can not the same directory, please use absolute path");
-        options.addOption(threadNumCommand, false, "Option. Default is 10,you can define the var,EG:20");
-        options.addOption(startFilePathCommand, false, "Option.This command must be used with startFilePath,startColumnNum together");
-        options.addOption(startColumnNumCommand, false, "Option. This command must be used with startFilePath,startColumnNum together");
-        options.addOption(taskStatusFilePathCommand, false, "Option. please use absolute path");
+        options.addOption(threadNumCommand, true, "Option. Default is 10,you can define the var,EG:20");
+        options.addOption(startFilePathCommand, true, "Option.This command must be used with startFilePath,startColumnNum together");
+        options.addOption(startColumnNumCommand, true, "Option. This command must be used with startFilePath,startColumnNum together");
+        options.addOption(taskStatusFilePathCommand, true, "Option. please use absolute path");
 
         CommandLineParser parser = new GnuParser();
         HelpFormatter helper = new HelpFormatter();
