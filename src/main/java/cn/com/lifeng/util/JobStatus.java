@@ -8,7 +8,7 @@ public class JobStatus {
     private String currentFileName = null;
     private String statusFilePath;
 
-    public static JobStatus clone(JobStatus jobStatus){
+    public static JobStatus clone(JobStatus jobStatus) {
         JobStatus newJobStatus = new JobStatus();
         newJobStatus.setCurrentFileName(jobStatus.getCurrentFileName());
         newJobStatus.setCurrentLineNumber(jobStatus.getCurrentLineNumber());
@@ -34,7 +34,7 @@ public class JobStatus {
 
     //todo 处理job status状态读取格式.以冒号分隔，文件中有冒号会发生错误
     public void setFileNameAndLineNumber(String fileNameAndLineNumber) {
-        if(fileNameAndLineNumber!=null && !fileNameAndLineNumber.trim().isEmpty()) {
+        if (fileNameAndLineNumber != null && !fileNameAndLineNumber.trim().isEmpty()) {
             String[] taskStatus = fileNameAndLineNumber.split(":");
             setCurrentFileName(taskStatus[0]);
             setCurrentLineNumber(Long.parseLong(taskStatus[1]));
@@ -51,5 +51,18 @@ public class JobStatus {
 
     public void setStatusFilePath(String statusFilePath) {
         this.statusFilePath = statusFilePath;
+    }
+
+    public boolean hasInitialed(){
+        if(currentFileName==null){
+            return false;
+        }
+        return true;
+    }
+    public String toString(){
+        if(currentFileName==null){
+            return "";
+        }
+        return currentFileName+":"+currentLineNumber;
     }
 }

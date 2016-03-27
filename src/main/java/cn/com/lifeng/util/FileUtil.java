@@ -8,32 +8,33 @@ import java.io.FileNotFoundException;
  */
 public class FileUtil {
 
-    public static void checkFileExist(String path) throws FileNotFoundException {
+    public static boolean checkFileExist(String path) {
         File file = new File(path);
-        if (!file.exists()) {
-            throw new FileNotFoundException(path);
-        }
+        boolean success = true;
+        if (!file.exists()) success = false;
+        return success;
     }
 
-    public static void mkDir(String path) throws Exception {
-        if(path.equals(".")) return;
+    public static boolean mkDir(String path) {
         int retryTimes = 3;
         boolean createSuccess = false;
         while (retryTimes > 0) {
             File file = new File(path);
-            if (file.exists()|| file.mkdirs()) {
+            if (file.exists() || file.mkdirs()) {
                 createSuccess = true;
                 break;
             }
             retryTimes -= 1;
         }
-        if (!createSuccess) throw new Exception("Path:" + path + " can not be initial");
+        return createSuccess;
     }
 
-    public static void isAbsolute(String path) throws Exception{
+    public static boolean isAbsolute(String path) {
         File file = new File(path);
-        if(!file.isAbsolute()){
-            throw new Exception("Path:" + path + " is not absolute");
+        boolean success = true;
+        if (!file.isAbsolute()) {
+            success = false;
         }
+        return success;
     }
 }

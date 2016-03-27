@@ -1,6 +1,7 @@
-package cn.com.lifeng.job;
+package cn.com.lifeng.taskserver;
 
 import cn.com.lifeng.util.JobStatus;
+import org.apache.log4j.Logger;
 
 import java.io.*;
 
@@ -8,6 +9,8 @@ import java.io.*;
  * Created by lifeng on 16/3/26.
  */
 public class JobStatusCacheTask {
+    static Logger logger = Logger.getLogger(JobStatus.class.getName());
+
     //用于记录任务处理状态，方便任务重启,减少应用
     public static JobStatus getTaskStatus(String statusFilePath) {
         JobStatus jobStatus = new JobStatus();
@@ -22,7 +25,6 @@ public class JobStatusCacheTask {
             String taskStatus = fileBuffer.readLine();
             jobStatus.setFileNameAndLineNumber(taskStatus);
         } catch (IOException e) {
-            System.out.println("Warn: Job init file "+statusFilePath +" is not existed, it will start the job from beginning");
         } finally {
             try {
                 if (fileBuffer != null) {

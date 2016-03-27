@@ -1,7 +1,6 @@
-package cn.com.lifeng.bootstrap;
+package cn.com.lifeng.taskclient;
 
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.nio.file.*;
 import java.text.ParseException;
@@ -29,13 +28,14 @@ public class FileNameCache {
     private String inputPath;
     private String outputPath;
 
-    public FileNameCache(String inputPath, String outputPath,String fileBegin) {
+    public FileNameCache(String inputPath, String outputPath, String fileBegin) {
         this.inputPath = inputPath;
         this.outputPath = outputPath;
 
         processFilePath(fileBegin);
     }
 
+    //todo 将相对路径改为绝对路径即可，以后支持
     private void processFilePath(String fileBegin) {
         if (!inputPath.endsWith(File.separator)) {
             inputPath += File.separator;
@@ -50,13 +50,21 @@ public class FileNameCache {
 
     public void startListAllFile() {
         Path dir = Paths.get(inputPath);
+        DirectoryStream<Path> stream = null;
         try {
-            DirectoryStream<Path> stream = Files.newDirectoryStream(dir);
+            stream = Files.newDirectoryStream(dir);
             for (Path file : stream) {
                 addFile(file.getFileName().toString());
             }
         } catch (IOException e) {
-            System.err.println(e);
+            e.printStackTrace();
+        }finally {
+            if(stream!=null)
+                try {
+                    stream.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
         }
     }
 

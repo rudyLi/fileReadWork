@@ -1,39 +1,41 @@
 package cn.com.lifeng;
 
-import cn.com.lifeng.bootstrap.Scheduler;
-import cn.com.lifeng.bootstrap.FileNameCache;
-import cn.com.lifeng.job.JobStatusCacheTask;
+import cn.com.lifeng.taskserver.Scheduler;
+import cn.com.lifeng.taskclient.FileNameCache;
+import cn.com.lifeng.taskserver.JobStatusCacheTask;
+import cn.com.lifeng.taskclient.TaskSubmitter;
 import cn.com.lifeng.util.FileUtil;
 import cn.com.lifeng.util.JobStatus;
 import org.apache.commons.cli.*;
-
+import org.apache.log4j.Logger;
 import java.io.File;
-import java.util.Iterator;
 
-/**
- * Hello world!
- */
 public class Bootstrap {
+    static Logger logger = Logger.getLogger(Bootstrap.class.getName());
 
     private int threadNum = 10;
-    private String statusFilePath = "./status";
+    private String statusFilePath=null;
     private String inputPath;
     private String outputPath;
     private String currentFileName = null;
-    private long  currentLineNumber = 1;
-    private Scheduler scheduler;
-    public Bootstrap(String inputPath, String outputPath) throws Exception {
+    private long currentLineNumber = 1;
+    private int bufferSize = 1024*1024;
+    private TaskSubmitter taskSubmitter;
+
+    public Bootstrap(String inputPath, String outputPath) {
         this.inputPath = inputPath;
         this.outputPath = outputPath;
-        FileUtil.isAbsolute(inputPath);
-        FileUtil.isAbsolute(inputPath);
+    }
+
+    public void setBufferSize(int bufferSize) {
+        this.bufferSize = bufferSize;
     }
 
     public void setThreadNum(int threadNum) {
         this.threadNum = threadNum;
     }
 
-    public void setTaskStatusPath( String taskStatusFilePath) throws Exception {
+    public void setTaskStatusPath(String taskStatusFilePath) throws Exception {
         statusFilePath = taskStatusFilePath;
         FileUtil.isAbsolute(statusFilePath);
     }
@@ -43,30 +45,39 @@ public class Bootstrap {
         this.currentLineNumber = Long.parseLong(startColumnNum);
     }
 
+    private void initialRelatedFile(){
+        if(!FileUtil.isAbsolute(inputPath) || !FileUtil.isAbsolute(inputPath)
+                || !FileUtil.checkFileExist(inputPath) || !FileUtil.mkDir(outputPath)) {
+            logger.error("The inputPath or outputPath has something wrong,please check it");
+            System.exit(-1);
+        }
+        if (statusFilePath==null) statusFilePath = System.getProperty("user.dir")+File.separator + "status";
+        //取出其中的目录路径
+        if(!FileUtil.mkDir(new File(statusFilePath).getParent())){
+            logger.error("The statusFilePath has something wrong,please check it");
+            System.exit(-1);
+        }
+    }
+
     private void initial() throws Exception {
         //检查相应的目录是否创建成果
-        checkFileExist();
+        initialRelatedFile();
         // 初始化jobstatus
         JobStatus jobStatus = JobStatusCacheTask.getTaskStatus(statusFilePath);
         // 修改 job运行状态
-        if(currentFileName!=null){
+        if (currentFileName != null) {
             jobStatus.setCurrentFileName(currentFileName);
             jobStatus.setCurrentLineNumber(currentLineNumber);
         }
         FileNameCache fileNameCache = new FileNameCache(inputPath, outputPath, jobStatus.getCurrentFileName());
-        scheduler = new Scheduler(fileNameCache, jobStatus, threadNum);
-
-    }
-
-    private void checkFileExist() throws Exception {
-        FileUtil.checkFileExist(inputPath);
-        FileUtil.mkDir(outputPath);
-        FileUtil.mkDir(statusFilePath.substring(0, statusFilePath.lastIndexOf(File.separator)));
+        Scheduler scheduler = new Scheduler(threadNum, bufferSize);
+        taskSubmitter = new TaskSubmitter(fileNameCache,jobStatus);
+        taskSubmitter.setScheduler(scheduler);
     }
 
     public void start() throws Exception {
         initial();
-        scheduler.start();
+        taskSubmitter.start();
     }
 
     public static void main(String[] args) {
@@ -112,7 +123,6 @@ public class Bootstrap {
             bootstrap.start();
         } catch (Exception e) {
             e.printStackTrace();
-            System.err.println(e.getMessage());
             helper.printHelp("Read File: ", options);
         }
     }
