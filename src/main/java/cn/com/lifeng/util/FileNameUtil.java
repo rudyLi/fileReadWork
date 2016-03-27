@@ -1,5 +1,7 @@
 package cn.com.lifeng.util;
 
+import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.nio.file.*;
 import java.text.ParseException;
@@ -30,6 +32,16 @@ public class FileNameUtil {
     public FileNameUtil(String inputPath, String outputPath) {
         this.inputPath = inputPath;
         this.outputPath = outputPath;
+        processFilePath();
+    }
+
+    private void processFilePath() {
+        if (!inputPath.endsWith(File.separator)) {
+            inputPath += File.separator;
+        }
+        if (!outputPath.endsWith(File.separator)) {
+            outputPath += File.separator;
+        }
     }
 
     public void setFileBegin(String fileBegin) {
@@ -45,8 +57,8 @@ public class FileNameUtil {
             for (Path file : stream) {
                 addFile(file.getFileName().toString());
             }
-        } catch (IOException x) {
-            System.err.println(x);
+        } catch (IOException e) {
+            System.err.println(e);
         }
     }
 
@@ -56,11 +68,12 @@ public class FileNameUtil {
 
     //thread unsafe 日期解析非线程安全的
     private int parseFileDate(String fileName) {
+        //todo 拿到具体文件名,支持相对路径时需做修改
         fileName = fileName.replace(inputPath, "");
         int date = 0;
         // 判断file合法性，
         if (fileName != null && fileName.length() == FILE_LENGTH && fileName.startsWith(FILE_PREFIX) && fileName.endsWith(FILE_POSTFIX)) {
-            String tmp = fileName.split(".")[1];
+            String tmp = fileName.split("\\.")[1];
             try {
                 Date tmpDate = displayFormat.parse(tmp);
                 date = Integer.parseInt(storageFormat.format(tmpDate));
@@ -84,6 +97,7 @@ public class FileNameUtil {
     private void sortAndAddFileName(int date) {
         if (size == 0) {
             fileNameCache[0] = date;
+            return;
         }
         int low = 0;
         int high = size - 1;
@@ -96,10 +110,10 @@ public class FileNameUtil {
             }
         }
         //这里需要移动数组，会有一部分性能开销
-        for (int i = size - 1; i <= low; i--) {
+        for (int i = size - 1; i > high && i <= low; i--) {
             fileNameCache[i + 1] = fileNameCache[i];
         }
-        fileNameCache[low + 1] = date;
+        fileNameCache[low] = date;
     }
 
     private void ensureCapacity(int minCapacity) {
@@ -137,5 +151,26 @@ public class FileNameUtil {
             name = outputPath + name;
         }
         return name;
+    }
+
+    public static void checkFileExist(String path) throws FileNotFoundException {
+        File file = new File(path);
+        if (!file.exists()) {
+            throw new FileNotFoundException(path);
+        }
+
+    }
+
+    public static void mkDir(String path) throws Exception {
+        int retryTimes = 3;
+        boolean createSuccess = false;
+        while (retryTimes < 0) {
+            File file = new File(path);
+            if (file.mkdirs()) {
+                createSuccess = true;
+                break;
+            }
+        }
+        if (createSuccess) throw new Exception("Path:" + path + " can not initial");
     }
 }

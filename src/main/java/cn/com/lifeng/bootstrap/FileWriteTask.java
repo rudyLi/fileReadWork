@@ -9,21 +9,24 @@ import java.util.concurrent.TimeUnit;
 public class FileWriteTask {
     private String inputFilePath;
     private String outputFilePath;
-    private double beginLineNumber;
+    private long beginLineNumber;
     private int retryTimes;
-    public FileWriteTask(String inputFilePath,String outPutFilePath,double beginLineNumber){
-        this(inputFilePath,outPutFilePath,beginLineNumber,3);
+
+    public FileWriteTask(String inputFilePath, String outPutFilePath, long beginLineNumber) {
+        this(inputFilePath, outPutFilePath, beginLineNumber, 3);
     }
-    public FileWriteTask(String inputFilePath,String outPutFilePath,double beginLineNumber, int retryTimes){
+
+    public FileWriteTask(String inputFilePath, String outPutFilePath, long beginLineNumber, int retryTimes) {
         this.inputFilePath = inputFilePath;
         this.outputFilePath = outPutFilePath;
         this.beginLineNumber = beginLineNumber;
         this.retryTimes = retryTimes;
     }
+
     public boolean startWrite() {
         boolean writeIsSuccess = true;
         while (retryTimes > 0) {
-            double lineNumber = beginLineNumber;
+            long lineNumber = beginLineNumber;
             writeIsSuccess = true;
             FileReader fileReader = null;
             BufferedReader bufferedReader = null;
@@ -38,8 +41,8 @@ public class FileWriteTask {
                 //buffer size 50k byte
                 bufferedWriter = new BufferedWriter(fileWriter, 51200);
                 String tmp;
-                while ((tmp=bufferedReader.readLine())!=null){
-                    bufferedWriter.write(lineNumber+"."+tmp);
+                while ((tmp = bufferedReader.readLine()) != null) {
+                    bufferedWriter.write(lineNumber + "." + tmp);
                     bufferedWriter.newLine();
                     lineNumber += 1;
                 }
@@ -61,7 +64,8 @@ public class FileWriteTask {
                     if (fileReader != null) {
                         fileReader.close();
                     }
-                    if(retryTimes>0) TimeUnit.MILLISECONDS.sleep(10);
+                    if (writeIsSuccess) break;
+                    if (retryTimes > 0) TimeUnit.MILLISECONDS.sleep(10);
                 } catch (IOException e) {
                     e.printStackTrace();
                 } catch (InterruptedException e) {

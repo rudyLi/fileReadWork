@@ -9,18 +9,21 @@ import java.util.concurrent.TimeUnit;
 public class FileLineNumberTask {
     private String filePath;
     private int retryTimes;
-    public FileLineNumberTask(String filePath){
-        this(filePath,3);
+
+    public FileLineNumberTask(String filePath) {
+        this(filePath, 3);
     }
-    public FileLineNumberTask(String filePath,int retryTimes){
+
+    public FileLineNumberTask(String filePath, int retryTimes) {
         this.filePath = filePath;
         this.retryTimes = retryTimes;
     }
+
     // -1代表文件读取出现问题
-    public int getLineNumber(){
+    public int getLineNumber() {
         int lineNumber = 0;
         boolean readIsSuccess = true;
-        while (retryTimes>0) {
+        while (retryTimes > 0) {
             //每次运行时需初始化
             lineNumber = 0;
             readIsSuccess = true;
@@ -40,14 +43,16 @@ public class FileLineNumberTask {
             } finally {
                 try {
                     retryTimes -= 1;
-                    if(bufferedReader!=null){
+                    if (bufferedReader != null) {
                         bufferedReader.close();
                     }
-                    if(fileReader!=null){
+                    if (fileReader != null) {
                         fileReader.close();
                     }
+                    // 执行成功则退出
+                    if (readIsSuccess) break;
                     //最后一次时不需要sleep
-                    if(retryTimes>0) TimeUnit.MILLISECONDS.sleep(10);
+                    if (retryTimes > 0) TimeUnit.MILLISECONDS.sleep(10);
                 } catch (IOException e) {
                     e.printStackTrace();
                 } catch (InterruptedException e) {
@@ -55,6 +60,6 @@ public class FileLineNumberTask {
                 }
             }
         }
-        return readIsSuccess ? lineNumber:-1;
+        return readIsSuccess ? lineNumber : -1;
     }
 }

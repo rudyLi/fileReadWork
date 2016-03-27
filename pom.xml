@@ -48,7 +48,8 @@
           </descriptorRefs>
           <archive>
             <manifest>
-              <mainClass>cn.com.lifeng.bootstrap</mainClass>
+              <addClasspath>true</addClasspath>
+              <mainClass>cn.com.lifeng.Bootstrap</mainClass>
             </manifest>
           </archive>
         </configuration>

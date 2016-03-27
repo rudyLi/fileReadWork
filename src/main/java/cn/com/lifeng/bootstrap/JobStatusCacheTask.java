@@ -12,16 +12,15 @@ public class JobStatusCacheTask {
     public static JobStatus getTaskStatus(String statusFilePath) {
         JobStatus jobStatus = new JobStatus();
         jobStatus.setStatusFilePath(statusFilePath);
-        String[] taskStatus = null;
         FileReader fileReader = null;
         BufferedReader fileBuffer = null;
         try {
             fileReader = new FileReader(statusFilePath);
-            //初始化其字节大小为30字节，默认缓存大小8k字节
-            fileBuffer = new BufferedReader(fileReader, 30);
-            taskStatus = fileBuffer.readLine().split("-");
-            jobStatus.setCurrentFileName(taskStatus[0]);
-            jobStatus.setCurrentLineNumber(Double.parseDouble(taskStatus[1]));
+            //默认缓存大小8k字节
+            //文件存储
+            fileBuffer = new BufferedReader(fileReader);
+            String taskStatus = fileBuffer.readLine();
+            jobStatus.setFileNameAndLineNumber(taskStatus);
         } catch (IOException e) {
             e.printStackTrace();
         } finally {
@@ -43,10 +42,10 @@ public class JobStatusCacheTask {
         FileWriter fileWriter = null;
         BufferedWriter bufferedWriter = null;
         try {
-            //初始化其字节大小为30字节，默认缓存大小8k字节
+            //默认缓存大小8k字节
             fileWriter = new FileWriter(jobStatus.getStatusFilePath());
-            bufferedWriter = new BufferedWriter(fileWriter, 30);
-            bufferedWriter.write(jobStatus.getCurrentFileName() + "-"+jobStatus.getCurrentLineNumber());
+            bufferedWriter = new BufferedWriter(fileWriter);
+            bufferedWriter.write(jobStatus.getFileNameAndLineNumber());
             bufferedWriter.flush();
         } catch (IOException e) {
             e.printStackTrace();
